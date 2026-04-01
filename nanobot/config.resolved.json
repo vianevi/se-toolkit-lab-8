@@ -1,0 +1,80 @@
+{
+  "agents": {
+    "defaults": {
+      "workspace": "./workspace",
+      "model": "coder-model",
+      "provider": "custom",
+      "maxTokens": 8192,
+      "contextWindowTokens": 65536,
+      "temperature": 0.1,
+      "maxToolIterations": 40,
+      "reasoningEffort": null
+    }
+  },
+  "providers": {
+    "custom": {
+      "apiKey": "my-secret-api-key-cmooon",
+      "apiBase": "http://qwen-code-api:8080/v1",
+      "extraHeaders": {
+        "X-API-Key": "my-secret-api-key-cmooon"
+      }
+    }
+  },
+  "channels": {
+    "sendProgress": true,
+    "sendToolHints": false,
+    "webchat": {
+      "enabled": true,
+      "allowFrom": [
+        "*"
+      ],
+      "host": "0.0.0.0",
+      "port": 8765,
+      "accessKey": "nadoelotut"
+    }
+  },
+  "tools": {
+    "web": {
+      "proxy": null,
+      "search": {
+        "provider": "brave",
+        "apiKey": "",
+        "baseUrl": "",
+        "maxResults": 5
+      }
+    },
+    "exec": {
+      "timeout": 60,
+      "pathAppend": ""
+    },
+    "restrictToWorkspace": false,
+    "mcpServers": {
+      "lms": {
+        "command": "python",
+        "args": [
+          "-m",
+          "mcp_lms"
+        ],
+        "env": {
+          "NANOBOT_LMS_BACKEND_URL": "http://backend:8000",
+          "NANOBOT_LMS_API_KEY": "my-secret-api-key-cmooon"
+        }
+      },
+      "webchat": {
+        "command": "python",
+        "args": [
+          "-m",
+          "mcp_webchat"
+        ],
+        "env": {
+          "NANOBOT_WEBCHAT_UI_RELAY_URL": "http://nanobot:8765/relay",
+          "NANOBOT_WEBCHAT_UI_TOKEN": "nadoelotut"
+        }
+      }
+    }
+  },
+  "gateway": {
+    "host": "0.0.0.0",
+    "port": 18790
+  }
+}
