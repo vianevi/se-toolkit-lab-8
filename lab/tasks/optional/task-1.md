@@ -16,10 +16,18 @@ The Telegram Bot API (`api.telegram.org`) is blocked from most Russian servers. 
 
 2. Uncomment the scaffolded `client-telegram-bot` service in `docker-compose.yml`:
    - Build from `nanobot-websocket-channel/client-telegram-bot/`
+   - Use the `additional_contexts` entry that exposes `./nanobot-websocket-channel` as the Docker build workspace, because the Dockerfile copies shared files from that repository root
    - Environment: `BOT_TOKEN`, `NANOBOT_ACCESS_KEY`, and `NANOBOT_WS_URL`
    - If the bot runs inside Docker Compose, use `NANOBOT_WS_URL=ws://nanobot:8765`
    - If the bot runs on your local machine or another host, use the public/proxied endpoint instead, for example `NANOBOT_WS_URL=ws://localhost:42002/ws/chat` with SSH port forwarding to the VM
    - `depends_on: nanobot`
+
+   If you use the repository root `uv` workspace tooling, also uncomment the
+   matching `nanobot-websocket-channel/client-telegram-bot` lines in the root
+   `pyproject.toml` under:
+
+   - `[tool.uv.workspace].members`
+   - `[tool.uv.sources]`
 
    Do not append `?access_key=...` yourself — the bot adds that query parameter automatically.
    If you run the bot outside Docker Compose, use the same environment variables and start it from `nanobot-websocket-channel/client-telegram-bot/` by following that repo's README.
