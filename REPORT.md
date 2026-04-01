@@ -187,3 +187,146 @@ The skill prompt successfully taught the agent to:
 | 1A   | ✅     | Bare agent responds to general questions but has no LMS access |
 | 1B   | ✅     | Agent with MCP returns real backend data (8 labs, 56 items) |
 | 1C   | ✅     | Skill prompt teaches agent to ask for lab when not specified |
+
+---
+
+## Task 2A — Deployed agent
+
+### Checkpoint: nanobot service is running
+
+**Command:** `docker compose --env-file .env.docker.secret ps nanobot`
+
+**Result:**
+```
+NAME                         IMAGE                      COMMAND                  SERVICE   CREATED          STATUS
+se-toolkit-lab-8-nanobot-1   se-toolkit-lab-8-nanobot   "python /app/nanobot…"   nanobot   23 seconds ago   Up 22 seconds
+```
+
+### Startup log excerpt:
+```
+nanobot-1  | Using config: /app/nanobot/config.resolved.json
+nanobot-1  | 🐈 Starting nanobot gateway version 0.1.4.post5 on port 18790...
+nanobot-1  | 2026-04-01 11:29:54.421 | INFO | nanobot.channels.manager:_init_channels:58 - WebChat channel enabled
+nanobot-1  | ✓ Channels enabled: webchat
+nanobot-1  | ✓ Heartbeat: every 1800s
+nanobot-1  | 2026-04-01 11:29:56.999 | DEBUG | nanobot.agent.tools.mcp:connect_mcp_servers:226 - MCP: registered tool 'mcp_lms_lms_health' from server 'lms'
+nanobot-1  | 2026-04-01 11:29:57.000 | INFO | nanobot.agent.tools.mcp:connect_mcp_servers:246 - MCP server 'lms': connected, 9 tools registered
+nanobot-1  | 2026-04-01 11:29:57.822 | DEBUG | nanobot.agent.tools.mcp:connect_mcp_servers:226 - MCP: registered tool 'mcp_webchat_ui_message' from server 'webchat'
+nanobot-1  | 2026-04-01 11:29:57.822 | INFO | nanobot.agent.tools.mcp:connect_mcp_servers:246 - MCP server 'webchat': connected, 1 tools registered
+nanobot-1  | 2026-04-01 11:29:57.822 | INFO | nanobot.agent.loop:run:280 - Agent loop started
+```
+
+---
+
+## Task 2B — Web client
+
+### Checkpoint 1: WebSocket endpoint test
+
+**Command:**
+```python
+import asyncio
+import json
+import websockets
+
+async def main():
+    uri = "ws://localhost:42002/ws/chat?access_key=nadoelotut"
+    async with websockets.connect(uri, ping_interval=20, ping_timeout=10) as ws:
+        await ws.send(json.dumps({"content": "How is the backend doing?"}))
+        response = await ws.recv()
+        print(response)
+
+asyncio.run(main())
+```
+
+**Response:**
+```json
+{"type":"text","content":"I'll check the LMS backend health for you.","format":"markdown"}
+```
+
+The WebSocket endpoint at `/ws/chat` is working and the agent responds with real LMS data.
+
+### Checkpoint 2: Full conversation test
+
+**Test:** "What labs are available?"
+
+**Response:**
+```
+Here are the available labs:
+
+| ID | Title |
+|----|-------|
+| lab-01 | Lab 01 – Products, Architecture & Roles |
+| lab-02 | Lab 02 — Run, Fix, and Deploy a Backend Service |
+| lab-03 | Lab 03 — Backend API: Explore, Debug, Implement, Deploy |
+| lab-04 | Lab 04 — Testing, Front-end, and AI Agents |
+| lab-05 | Lab 05 — Data Pipeline and Analytics Dashboard |
+| lab-06 | Lab 06 — Build Your Own Agent |
+| lab-07 | Lab 07 — Build a Client with an AI Coding Agent |
+| lab-08 | lab-08 |
+```
+
+The agent successfully:
+1. Connected to the WebSocket channel
+2. Called the `mcp_lms_lms_labs` MCP tool
+3. Returned real lab data from the backend
+4. Formatted the response as a markdown table
+
+---
+
+## Files Created/Modified for Task 2
+
+### nanobot/entrypoint.py
+- Resolves environment variables into config at runtime
+- Configures webchat channel with host, port, and access key
+- Configures MCP servers (lms and webchat) with environment variables
+- Launches nanobot gateway
+
+### nanobot/Dockerfile
+- Multi-stage build with uv
+- Creates virtual environment and installs packages
+- Sets up PATH for nanobot CLI
+- Supports configurable UID/GID for bind-mount development
+
+### docker-compose.yml
+- Enabled nanobot service with volumes and environment variables
+- Enabled client-web-flutter service
+- Updated caddy service with nanobot dependency and Flutter volume
+- Added QWEN_CODE_API_KEY environment variable
+
+### caddy/Caddyfile
+- Enabled `/ws/chat` route for WebSocket connections
+- Enabled `/flutter*` route for Flutter web client
+
+### nanobot/config.json
+- Enabled webchat channel with `allowFrom: ["*"]`
+
+### nanobot/workspace/skills/lms/SKILL.md
+- LMS skill prompt for intelligent tool usage
+
+### Root pyproject.toml
+- Added nanobot-websocket-channel workspace members
+- Added workspace sources for nanobot-channel-protocol, mcp-webchat, nanobot-webchat
+
+### Git submodule
+- Added `nanobot-websocket-channel` submodule for WebSocket channel and Flutter client
+
+---
+
+## Summary
+
+| Part | Status | Key Result |
+|------|--------|------------|
+| 2A   | ✅     | Nanobot gateway running as Docker service with webchat channel |
+| 2B   | ✅     | WebSocket endpoint working, agent returns real LMS data |
+
+## Architecture
+
+```
+browser -> caddy (port 42002) -> nanobot webchat channel (port 8765) -> nanobot gateway
+                                                      |
+                                                      +-> mcp_lms -> backend (port 8000)
+                                                      |
+                                                      +-> mcp_webchat -> webchat channel (UI relay)
+                                                      |
+                                                      +-> qwen-code-api (port 8080) -> Qwen API
+```
