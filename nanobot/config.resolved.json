@@ -70,6 +70,17 @@
           "NANOBOT_WEBCHAT_UI_RELAY_URL": "http://nanobot:8765/relay",
           "NANOBOT_WEBCHAT_UI_TOKEN": "nadoelotut"
         }
+      },
+      "obs": {
+        "command": "python",
+        "args": [
+          "-m",
+          "mcp_obs"
+        ],
+        "env": {
+          "VICTORIALOGS_URL": "http://victorialogs:9428",
+          "VICTORIATRACES_URL": "http://victoriatraces:10428"
+        }
       }
     }
   },
