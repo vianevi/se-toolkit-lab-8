@@ -26,7 +26,7 @@ COPY --from=workspace nanobot/ /app/nanobot/
 # Create virtual environment and install packages
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv venv /app/.venv && \
-    VIRTUAL_ENV=/app/.venv uv pip install /app/mcp /app/nanobot-websocket-channel/mcp-webchat /app/nanobot-websocket-channel/nanobot-webchat && \
+    VIRTUAL_ENV=/app/.venv uv pip install /app/mcp /app/mcp/mcp-obs /app/nanobot-websocket-channel/mcp-webchat /app/nanobot-websocket-channel/nanobot-webchat && \
     VIRTUAL_ENV=/app/.venv uv pip install "nanobot-ai @ https://github.com/HKUDS/nanobot/archive/e7d371ec1e6531b28898ec2c869ef338e8dd46ec.zip"
 
 # Copy the rest of nanobot source (config, entrypoint, workspace)

@@ -130,6 +130,9 @@ services:
       # WebChat MCP server for structured UI
       - NANOBOT_WEBCHAT_UI_RELAY_URL=http://nanobot:${NANOBOT_WEBCHAT_CONTAINER_PORT}/relay
       - NANOBOT_WEBCHAT_UI_TOKEN=${NANOBOT_ACCESS_KEY}
+      # Observability MCP server for logs and traces
+      - VICTORIALOGS_URL=http://victorialogs:${CONST_VICTORIALOGS_CONTAINER_PORT}
+      - VICTORIATRACES_URL=http://victoriatraces:${CONST_VICTORIATRACES_CONTAINER_PORT}
     depends_on:
       - backend
       - qwen-code-api

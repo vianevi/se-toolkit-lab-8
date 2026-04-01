@@ -107,6 +107,23 @@ def main() -> None:
                 "env": env,
             }
 
+    # Observability MCP server for logs and traces
+    victorialogs_url = os.environ.get("VICTORIALOGS_URL")
+    victoriatraces_url = os.environ.get("VICTORIATRACES_URL")
+
+    if victorialogs_url or victoriatraces_url:
+        env = {}
+        if victorialogs_url:
+            env["VICTORIALOGS_URL"] = victorialogs_url
+        if victoriatraces_url:
+            env["VICTORIATRACES_URL"] = victoriatraces_url
+        if env:
+            config["tools"]["mcpServers"]["obs"] = {
+                "command": "python",
+                "args": ["-m", "mcp_obs"],
+                "env": env,
+            }
+
     # Write resolved config
     with open(resolved_path, "w") as f:
         json.dump(config, f, indent=2)

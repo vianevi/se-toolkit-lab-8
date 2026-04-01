@@ -330,3 +330,173 @@ browser -> caddy (port 42002) -> nanobot webchat channel (port 8765) -> nanobot 
                                                       |
                                                       +-> qwen-code-api (port 8080) -> Qwen API
 ```
+
+---
+
+# Task 3 — Give the Agent New Eyes (Observability)
+
+## Task 3A — Structured logging
+
+### Happy-path log excerpt (request_started → request_completed with status 200):
+
+Triggered a successful request to `/items/` and observed these structured log entries:
+
+```
+2026-04-01 15:23:59,942 INFO [app.main] [main.py:60] [trace_id=94d8ad7c4f634c3a00f38ae03b018291 span_id=75eaa41aa95fbe44 resource.service.name=Learning Management Service trace_sampled=True] - request_started
+2026-04-01 15:23:59,948 INFO [app.auth] [auth.py:30] [trace_id=94d8ad7c4f634c3a00f38ae03b018291 span_id=75eaa41aa95fbe44 resource.service.name=Learning Management Service trace_sampled=True] - auth_success
+2026-04-01 15:23:59,949 INFO [app.db.items] [items.py:16] [trace_id=94d8ad7c4f634c3a00f38ae03b018291 span_id=75eaa41aa95fbe44 resource.service.name=Learning Management Service trace_sampled=True] - db_query
+2026-04-01 15:24:00,066 INFO [app.main] [main.py:68] [trace_id=94d8ad7c4f634c3a00f38ae03b018291 span_id=75eaa41aa95fbe44 resource.service.name=Learning Management Service trace_sampled=True] - request_completed
+INFO:     172.18.0.1:59116 - "GET /items/ HTTP/1.1" 200 OK
+```
+
+Each entry includes structured fields: `trace_id`, `span_id`, `resource.service.name`, `trace_sampled`, `severity`, `event`.
+
+### Error-path log excerpt (db_query with error):
+
+Stopped PostgreSQL and triggered a failing request. Observed error log:
+
+```
+2026-04-01 15:26:09,529 INFO [app.main] [main.py:60] [trace_id=c38630dc961a7f3476ac364cdea27d63 span_id=966ca3b918f5abf5 resource.service.name=Learning Management Service trace_sampled=True] - request_started
+2026-04-01 15:26:09,530 INFO [app.auth] [auth.py:30] [trace_id=c38630dc961a7f3476ac364cdea27d63 span_id=966ca3b918f5abf5 resource.service.name=Learning Management Service trace_sampled=True] - auth_success
+2026-04-01 15:26:09,531 INFO [app.db.items] [items.py:16] [trace_id=c38630dc961a7f3476ac364cdea27d63 span_id=966ca3b918f5abf5 resource.service.name=Learning Management Service trace_sampled=True] - db_query
+2026-04-01 15:26:09,536 ERROR [app.db.items] [items.py:20] [trace_id=c38630dc961a7f3476ac364cdea27d63 span_id=966ca3b918f5abf5 resource.service.name=Learning Management Service trace_sampled=True] - db_query
+2026-04-01 15:26:09,537 INFO [app.main] [main.py:68] [trace_id=c38630dc961a7f3476ac364cdea27d63 span_id=966ca3b918f5abf5 resource.service.name=Learning Management Service trace_sampled=True] - request_completed
+INFO:     172.18.0.1:60296 - "GET /items/ HTTP/1.1" 404
+```
+
+The error log from VictoriaLogs API:
+```json
+{
+  "_msg": "db_query",
+  "error": "(sqlalchemy.dialects.postgresql.asyncpg.InterfaceError) <class 'asyncpg.exceptions._base.InterfaceError'>: connection is closed",
+  "event": "db_query",
+  "operation": "select",
+  "table": "item",
+  "service.name": "Learning Management Service",
+  "severity": "ERROR",
+  "trace_id": "c38630dc961a7f3476ac364cdea27d63",
+  "_time": "2026-04-01T15:26:09.536471296Z"
+}
+```
+
+The request returned HTTP 404. The same `trace_id` links all log entries for this request.
+
+### VictoriaLogs UI Query
+
+**URL:** http://localhost:42002/utils/victorialogs/select/vmui/
+
+**Query:** `_time:1h service.name:"Learning Management Service" severity:ERROR`
+
+*(Add your VictoriaLogs UI screenshot here)*
+
+---
+
+## Task 3B — Traces
+
+### VictoriaTraces UI
+
+**URL:** http://localhost:42002/utils/victoriatraces/select/vmui/
+
+### Healthy Trace
+
+**Trace ID:** `94d8ad7c4f634c3a00f38ae03b018291`
+
+A successful request shows the following span hierarchy:
+```
+Trace ID: 94d8ad7c4f634c3a00f38ae03b018291
+Spans:
+  GET /items/ - 126223us - {'http.status_code': '200'}
+  SELECT db-lab-8 - 23950us - {'db.system': 'postgresql'}
+  connect - 76718us - {'db.system': 'postgresql'}
+  BEGIN; - 4370us - {'db.system': 'postgresql'}
+  BEGIN; - 1829us - {'db.system': 'postgresql'}
+  ROLLBACK; - 262us - {'db.system': 'postgresql'}
+  ROLLBACK; - 728us - {'db.system': 'postgresql'}
+  GET /items/ http send - 44us - {'http.status_code': '200'}
+```
+
+*(Add your healthy trace screenshot here)*
+
+### Error Trace
+
+**Trace ID:** `c38630dc961a7f3476ac364cdea27d63`
+
+The error trace shows:
+```
+Trace ID: c38630dc961a7f3476ac364cdea27d63
+Spans:
+  GET /items/ - 11238us - {'http.status_code': '404'}
+  SELECT db-lab-8 - 3189us - {'db.system': 'postgresql', 'error': 'true', 'otel.status_description': "<class 'asyncpg.exceptions._base.InterfaceError'>: connection is closed"}
+  connect - 221us - {'db.system': 'postgresql'}
+  GET /items/ http send - 49us - {'http.status_code': '404'}
+```
+
+The error appears in the `SELECT db-lab-8` span where the database connection failed with `error: true` and status code 404.
+
+*(Add your error trace screenshot here)*
+
+---
+
+## Task 3C — Observability MCP tools
+
+### MCP Tools Implementation
+
+The observability MCP server (`mcp/mcp-obs`) provides four tools:
+
+1. **obs_logs_search** — Search logs in VictoriaLogs using LogsQL query
+2. **obs_logs_error_count** — Count errors per service over a time window
+3. **obs_traces_list** — List recent traces for a service
+4. **obs_traces_get** — Fetch a specific trace by ID
+
+### Files Created/Modified
+
+- `mcp/mcp-obs/src/mcp_obs/server.py` — MCP server implementation
+- `mcp/mcp-obs/pyproject.toml` — Package configuration
+- `nanobot/workspace/skills/observability/SKILL.md` — Observability skill prompt
+- `nanobot/entrypoint.py` — Already configured to load obs MCP server
+- `pyproject.toml` — Already includes mcp-obs workspace member
+
+### Agent Test: Normal Conditions
+
+**Question:** "Any LMS backend errors in the last 10 minutes?"
+
+**Response:**
+```
+**No LMS backend errors found in the last 10 minutes.**
+
+I checked the recent traces for the Learning Management Service...
+```
+
+The agent correctly used the observability tools:
+- `mcp_obs_obs_logs_error_count` — Checked error count
+- `mcp_obs_obs_logs_search` — Searched for error logs
+- `mcp_obs_obs_traces_list` — Listed recent traces
+- `mcp_obs_obs_traces_get` — Fetched specific traces
+
+### Agent Test: Failure Conditions
+
+Stopped PostgreSQL, triggered failing requests, then asked the same question.
+
+**Response:**
+```
+I found an issue in the LMS backend traces. Here's what I discovered:
+
+**Error Found:**
+- **Type**: Database connection error
+- **Service**: Learning Management Service
+- **Trace ID**: 9fc30ff8a72067aa5aa10a7b76035899
+- **Error**: connection is closed (asyncpg.exceptions._base.InterfaceError)
+- **HTTP Status**: 404
+
+The error occurred in the db_query span when attempting to SELECT from the item table.
+The database connection was closed because PostgreSQL was stopped.
+```
+
+The agent correctly:
+1. Detected errors using `obs_logs_error_count`
+2. Searched logs using `obs_logs_search`
+3. Found the trace ID in the error logs
+4. Fetched the full trace using `obs_traces_get`
+5. Summarized the findings concisely
+
+*(Add screenshots of agent responses here)*
